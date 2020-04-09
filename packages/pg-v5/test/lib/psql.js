@@ -233,11 +233,6 @@ describe('psql', () => {
 
       context('when HEROKU_PSQL_HISTORY is a valid directory path', () => {
         it('is the directory path to per-app history files', () => {
-          const env = {
-            PGAPPNAME: 'psql interactive',
-            PGSSLMODE: 'prefer'
-          }
-
           const cp = sinon.stub(require('child_process'), 'spawn')
           const existsSyncStub = sinon.stub(require('fs'), 'existsSync').callsFake(() => true)
           const statSyncStub = sinon.stub(require('fs'), 'statSync').returns({ isDirectory: () => true })
@@ -276,11 +271,6 @@ describe('psql', () => {
 
       context('when HEROKU_PSQL_HISTORY is a valid file path', () => {
         it('is the path to the history file', () => {
-          const env = {
-            PGAPPNAME: 'psql interactive',
-            PGSSLMODE: 'prefer'
-          }
-
           const cp = sinon.stub(require('child_process'), 'spawn')
           const existsSyncStub = sinon.stub(require('fs'), 'existsSync').callsFake(() => true)
           const statSyncStub = sinon.stub(require('fs'), 'statSync').returns({ isDirectory: () => false })
@@ -321,12 +311,6 @@ describe('psql', () => {
         it('issues a warning', () => {
           const cli = require('heroku-cli-util')
           cli.mockConsole()
-          const env = Object.assign({}, process.env, {
-            PGAPPNAME: 'psql interactive',
-            PGSSLMODE: 'prefer'
-          })
-
-          const opts = { env: env, stdio: 'inherit' }
           const cpMock = sinon.stub(require('child_process'), 'spawn')
           const existsSyncStub = sinon.stub(require('fs'), 'existsSync').callsFake(() => false)
 
