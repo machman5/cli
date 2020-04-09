@@ -59,18 +59,9 @@ describe('psql', () => {
     })
 
     it('runs psql', () => {
-      let cp = sandbox.mock(require('child_process'))
-      let env = Object.assign({}, process.env, {
-        PGAPPNAME: 'psql non-interactive',
-        PGSSLMODE: 'prefer',
-        PGUSER: 'jeff',
-        PGPASSWORD: 'pass',
-        PGDATABASE: 'mydb',
-        PGPORT: 5432,
-        PGHOST: 'localhost'
-      })
-      let opts = { env: env, encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'inherit' ] }
-      cp.expects('spawn').withExactArgs('psql', ['-c', 'SELECT NOW();', '--set', 'sslmode=require'], opts).once().returns(
+      let cp = sandbox.stub(require('child_process'), 'spawn')
+      let args = ['-c', 'SELECT NOW();', '--set', 'sslmode=require']
+      cp.returns(
         {
           stdout: {
             on: (key, callback) => {
@@ -89,11 +80,12 @@ describe('psql', () => {
         }
       )
       return psql.exec(db, 'SELECT NOW();')
-        .then(() => cp.verify())
+        .then(() => expect(cp.firstCall.args[0], 'to equal', 'psql'))
+        .then(() => expect(cp.firstCall.args[1], 'to equal', args))
         .then(() => cp.restore())
     })
     it('opens an SSH tunnel and runs psql for bastion databases', () => {
-      let cp = sandbox.mock(require('child_process'))
+      let cp = sandbox.stub(require('child_process'), 'spawn')
       let tunnelConf = {
         username: 'bastion',
         host: 'bastion-host',
@@ -103,7 +95,8 @@ describe('psql', () => {
         localHost: '127.0.0.1',
         localPort: 49152
       }
-      cp.expects('spawn').withArgs('psql', ['-c', 'SELECT NOW();', '--set', 'sslmode=require']).once().returns(
+      let args = ['-c', 'SELECT NOW();', '--set', 'sslmode=require']
+      cp.returns(
         {
           stdout: {
             on: (key, callback) => {
@@ -124,7 +117,8 @@ describe('psql', () => {
       return psql.exec(bastionDb, 'SELECT NOW();', 1000)
         .then(() => expect(
           tunnelStub.withArgs(tunnelConf).calledOnce, 'to equal', true))
-        .then(() => cp.verify())
+        .then(() => expect(cp.firstCall.args[0], 'to equal', 'psql'))
+        .then(() => expect(cp.firstCall.args[1], 'to equal', args))
         .then(() => cp.restore())
     })
   })
@@ -151,18 +145,10 @@ describe('psql', () => {
     })
 
     it('runs psql', () => {
-      let cp = sandbox.mock(require('child_process'))
-      let env = Object.assign({}, process.env, {
-        PGAPPNAME: 'psql non-interactive',
-        PGSSLMODE: 'prefer',
-        PGUSER: 'jeff',
-        PGPASSWORD: 'pass',
-        PGDATABASE: 'mydb',
-        PGPORT: 5432,
-        PGHOST: 'localhost'
-      })
-      let opts = { env: env, encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'inherit' ] }
-      cp.expects('spawn').withExactArgs('psql', ['-f', 'test.sql', '--set', 'sslmode=require'], opts).once().returns(
+      let cp = sandbox.stub(require('child_process'), 'spawn')
+      let opts = { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'inherit' ] }
+      let args = ['-f', 'test.sql', '--set', 'sslmode=require']
+      cp.returns(
         {
           stdout: {
             on: (key, callback) => {
@@ -181,11 +167,14 @@ describe('psql', () => {
         }
       )
       return psql.execFile(db, 'test.sql')
-        .then(() => cp.verify())
+        .then(() => expect(cp.firstCall.args[0], 'to equal', 'psql'))
+        .then(() => expect(cp.firstCall.args[1], 'to equal', args))
+        .then(() => expect(cp.firstCall.args[2].encoding, 'to equal', opts.encoding))
+        .then(() => expect(cp.firstCall.args[2].stdio, 'to equal', opts.stdio))
         .then(() => cp.restore())
     })
     it('opens an SSH tunnel and runs psql for bastion databases', () => {
-      let cp = sandbox.mock(require('child_process'))
+      let cp = sandbox.stub(require('child_process'), 'spawn')
       let tunnelConf = {
         username: 'bastion',
         host: 'bastion-host',
@@ -195,7 +184,8 @@ describe('psql', () => {
         localHost: '127.0.0.1',
         localPort: 49152
       }
-      cp.expects('spawn').withArgs('psql', ['-f', 'test.sql', '--set', 'sslmode=require']).once().returns(
+      const args = ['-f', 'test.sql', '--set', 'sslmode=require']
+      cp.returns(
         {
           stdout: {
             on: (key, callback) => {
@@ -216,7 +206,8 @@ describe('psql', () => {
       return psql.execFile(bastionDb, 'test.sql', 1000)
         .then(() => expect(
           tunnelStub.withArgs(tunnelConf).calledOnce, 'to equal', true))
-        .then(() => cp.verify())
+        .then(() => expect(cp.firstCall.args[0], 'to equal', 'psql'))
+        .then(() => expect(cp.firstCall.args[1], 'to equal', args))
         .then(() => cp.restore())
     })
   })
@@ -242,13 +233,12 @@ describe('psql', () => {
 
       context('when HEROKU_PSQL_HISTORY is a valid directory path', () => {
         it('is the directory path to per-app history files', () => {
-          const env = Object.assign({}, process.env, {
+          const env = {
             PGAPPNAME: 'psql interactive',
             PGSSLMODE: 'prefer'
-          })
+          }
 
-          const opts = { env: env, stdio: 'inherit' }
-          const cpMock = sinon.mock(require('child_process'))
+          const cp = sinon.stub(require('child_process'), 'spawn')
           const existsSyncStub = sinon.stub(require('fs'), 'existsSync').callsFake(() => true)
           const statSyncStub = sinon.stub(require('fs'), 'statSync').returns({ isDirectory: () => true })
 
@@ -263,7 +253,7 @@ describe('psql', () => {
             'sslmode=require'
           ]
 
-          cpMock.expects('spawn').withExactArgs('psql', args, opts).once().returns(
+          cp.returns(
             {
               on: (key, callback) => {
                 if (key === 'close') {
@@ -274,9 +264,10 @@ describe('psql', () => {
           )
 
           return psql.interactive(db)
-            .then(() => cpMock.verify())
+            .then(() => expect(cp.firstCall.args[0], 'to equal', 'psql'))
+            .then(() => expect(cp.firstCall.args[1], 'to equal', args))
             .finally(() => {
-              cpMock.restore()
+              cp.restore()
               existsSyncStub.restore()
               statSyncStub.restore()
             })
@@ -285,13 +276,12 @@ describe('psql', () => {
 
       context('when HEROKU_PSQL_HISTORY is a valid file path', () => {
         it('is the path to the history file', () => {
-          const env = Object.assign({}, process.env, {
+          const env = {
             PGAPPNAME: 'psql interactive',
             PGSSLMODE: 'prefer'
-          })
+          }
 
-          const opts = { env: env, stdio: 'inherit' }
-          const cpMock = sinon.mock(require('child_process'))
+          const cp = sinon.stub(require('child_process'), 'spawn')
           const existsSyncStub = sinon.stub(require('fs'), 'existsSync').callsFake(() => true)
           const statSyncStub = sinon.stub(require('fs'), 'statSync').returns({ isDirectory: () => false })
 
@@ -306,7 +296,7 @@ describe('psql', () => {
             'sslmode=require'
           ]
 
-          cpMock.expects('spawn').withExactArgs('psql', args, opts).once().returns(
+          cp.returns(
             {
               on: (key, callback) => {
                 if (key === 'close') {
@@ -317,9 +307,10 @@ describe('psql', () => {
           )
 
           return psql.interactive(db)
-            .then(() => cpMock.verify())
+            .then(() => expect(cp.firstCall.args[0], 'to equal', 'psql'))
+            .then(() => expect(cp.firstCall.args[1], 'to equal', args))
             .finally(() => {
-              cpMock.restore()
+              cp.restore()
               existsSyncStub.restore()
               statSyncStub.restore()
             })
@@ -336,7 +327,7 @@ describe('psql', () => {
           })
 
           const opts = { env: env, stdio: 'inherit' }
-          const cpMock = sinon.mock(require('child_process'))
+          const cpMock = sinon.stub(require('child_process'), 'spawn')
           const existsSyncStub = sinon.stub(require('fs'), 'existsSync').callsFake(() => false)
 
           const args = [
@@ -348,7 +339,7 @@ describe('psql', () => {
             'sslmode=require'
           ]
 
-          cpMock.expects('spawn').withExactArgs('psql', args, opts).once().returns(
+          cpMock.returns(
             {
               on: (key, callback) => {
                 if (key === 'close') {
@@ -359,7 +350,7 @@ describe('psql', () => {
           )
 
           return psql.interactive(db)
-            .then(() => cpMock.verify())
+            .then(() => expect(cpMock.firstCall.args[1], 'to equal', args))
             .then(() => expect(unwrap(cli.stderr), 'to equal', `HEROKU_PSQL_HISTORY is set but is not a valid path (${path.join('/', 'path', 'to', 'history')})\n`))
             .finally(() => {
               cpMock.restore()
